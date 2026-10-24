@@ -137,16 +137,19 @@ CREATE INDEX IF NOT EXISTS reports_public_idx ON public.reports(public_visible, 
 -- 9. Report Access Checking Functions & Policies
 CREATE OR REPLACE FUNCTION public.can_manage_report(_id uuid)
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
-  SELECT EXISTS(
+  SELECT public.has_role(auth.uid(), 'admin')
+  OR EXISTS(
     SELECT 1 FROM public.reports r
     JOIN public.user_roles u ON u.user_id = auth.uid()
-    WHERE r.id = _id AND (u.role = 'admin' OR (u.role = 'department_officer' AND u.department_id = r.department_id))
+    WHERE r.id = _id AND (u.role = 'department_officer' AND u.department_id = r.department_id)
   );
 $$;
 
 CREATE OR REPLACE FUNCTION public.can_read_report(_id uuid)
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
-  SELECT EXISTS(SELECT 1 FROM public.reports WHERE id = _id AND user_id = auth.uid()) OR public.can_manage_report(_id);
+  SELECT public.has_role(auth.uid(), 'admin')
+  OR EXISTS(SELECT 1 FROM public.reports WHERE id = _id AND user_id = auth.uid())
+  OR public.can_manage_report(_id);
 $$;
 
 REVOKE ALL ON FUNCTION public.can_manage_report(uuid), public.can_read_report(uuid) FROM PUBLIC, anon;

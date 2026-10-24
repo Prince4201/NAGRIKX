@@ -357,6 +357,52 @@ export type Database = {
         Args: { _id: string; _message: string }
         Returns: undefined
       }
+      admin_all_reports: {
+        Args: {
+          _search?: string
+          _status?: string
+          _category?: string
+          _department_id?: string
+          _page?: number
+        }
+        Returns: {
+          id: string
+          reference: number
+          title: string
+          description: string
+          category: string
+          address: string
+          city: string
+          status: Database["public"]["Enums"]["report_status"]
+          priority: string
+          public_visible: boolean
+          department_id: string | null
+          department_name: string | null
+          assigned_officer: string | null
+          officer_name: string | null
+          user_id: string
+          citizen_name: string
+          citizen_email: string
+          photo_count: number
+          resolution_note: string | null
+          created_at: string
+          updated_at: string
+        }[]
+      }
+      admin_send_notification: {
+        Args: {
+          _message: string
+          _target_role?: string
+          _target_department?: string
+          _target_user?: string
+          _report_id?: string
+        }
+        Returns: number
+      }
+      admin_reply_report: {
+        Args: { _report_id: string; _message: string }
+        Returns: undefined
+      }
       admin_approve_officer: {
         Args: { _app_id: string }
         Returns: undefined

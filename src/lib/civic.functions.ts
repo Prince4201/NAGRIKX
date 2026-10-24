@@ -95,3 +95,50 @@ export const getPublicData = createServerFn({method:'GET'}).validator(z.object({
  if(rows.error||stats.error) throw new Error('Community records are temporarily unavailable.');
  return {reports:rows.data??[],stats:stats.data as {total:number;resolved:number;active:number;cities:number}};
 });
+
+// ── Admin: Fetch all platform reports with full details ─────────────────
+export const getAdminAllReports = createServerFn({method:'POST'}).middleware([requireSupabaseAuth]).validator(z.object({
+  search: z.string().max(100).default(''),
+  status: z.string().max(40).default(''),
+  category: z.string().max(40).default(''),
+  departmentId: z.string().nullable().default(null),
+  page: z.number().int().min(0).default(0),
+})).handler(async({data,context})=>{
+  const args: Record<string, unknown> = {
+    _search: data.search,
+    _status: data.status,
+    _category: data.category,
+    _page: data.page,
+  };
+  if (data.departmentId) args['_department_id'] = data.departmentId;
+  const r = await context.supabase.rpc('admin_all_reports', args as Database['public']['Functions']['admin_all_reports']['Args']);
+  if(r.error) { console.warn('[getAdminAllReports] RPC error:', r.error.message); throw new Error(r.error.message); }
+  return r.data ?? [];
+});
+
+// ── Admin: Broadcast or targeted notification ──────────────────────────
+export const adminSendNotification = createServerFn({method:'POST'}).middleware([requireSupabaseAuth]).validator(z.object({
+  message: z.string().trim().min(2).max(2000),
+  targetRole: z.string().max(40).default(''),
+  targetDepartment: z.string().nullable().default(null),
+  targetUser: z.string().nullable().default(null),
+  reportId: z.string().nullable().default(null),
+})).handler(async({data,context})=>{
+  const args: Record<string, unknown> = { _message: data.message };
+  if (data.targetRole) args['_target_role'] = data.targetRole;
+  if (data.targetDepartment) args['_target_department'] = data.targetDepartment;
+  if (data.targetUser) args['_target_user'] = data.targetUser;
+  if (data.reportId) args['_report_id'] = data.reportId;
+  const r = await context.supabase.rpc('admin_send_notification', args as Database['public']['Functions']['admin_send_notification']['Args']);
+  if(r.error) throw new Error(r.error.message);
+  return r.data ?? 0;
+});
+
+// ── Admin: Reply to a report ───────────────────────────────────────────
+export const adminReplyReport = createServerFn({method:'POST'}).middleware([requireSupabaseAuth]).validator(z.object({
+  reportId: pgUuid,
+  message: z.string().trim().min(2).max(1000),
+})).handler(async({data,context})=>{
+  const r = await context.supabase.rpc('admin_reply_report', { _report_id: data.reportId, _message: data.message } as Database['public']['Functions']['admin_reply_report']['Args']);
+  if(r.error) throw new Error(r.error.message);
+});
