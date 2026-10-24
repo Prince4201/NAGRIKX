@@ -1,0 +1,231 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * NAGRIKX design system — "Contemporary Indian Civic".
+ * Warm ivory surfaces, forest green for trust/success, vivid orange for action.
+ * All colours are oklch. Add a token in :root, then map it in @theme inline.
+ */
+
+@theme inline {
+  --font-sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Fraunces", ui-serif, Georgia, serif;
+  --font-mono: "Geist Mono", ui-monospace, monospace;
+
+  --radius-sm: calc(var(--radius) - 6px);
+  --radius-md: calc(var(--radius) - 3px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 6px);
+  --radius-2xl: calc(var(--radius) + 12px);
+  --radius-3xl: calc(var(--radius) + 20px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ring-offset-background: var(--background);
+
+  /* Brand tokens */
+  --color-ivory: var(--ivory);
+  --color-forest: var(--forest);
+  --color-forest-foreground: var(--forest-foreground);
+  --color-ember: var(--ember);
+  --color-ember-foreground: var(--ember-foreground);
+  --color-sage: var(--sage);
+  --color-peach: var(--peach);
+  --color-ink: var(--ink);
+  --color-ink-foreground: var(--ink-foreground);
+  --color-paper: var(--paper);
+  --color-success: var(--forest);
+  --color-warning: var(--warning);
+
+  --shadow-soft: var(--shadow-soft);
+  --shadow-lift: var(--shadow-lift);
+  --shadow-ember: var(--shadow-ember);
+  --color-hero-scrim: var(--hero-scrim);
+
+  --ease-civic: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+:root {
+  --radius: 0.5rem;
+
+  --ivory: oklch(0.977 0.01 88);
+  --paper: oklch(1 0 0);
+  --forest: oklch(0.38 0.06 166);
+  --forest-foreground: oklch(0.977 0.01 88);
+  --ember: oklch(0.71 0.18 44);
+  --ember-foreground: oklch(0.24 0.015 135);
+  --sage: oklch(0.92 0.03 140);
+  --peach: oklch(0.93 0.045 58);
+  --ink: oklch(0.25 0.012 135);
+  --ink-foreground: oklch(0.977 0.01 88);
+  --warning: oklch(0.8 0.14 80);
+  --hero-scrim: oklch(0.22 0.025 166);
+  --gradient-hero: linear-gradient(90deg, var(--ivory) 0%, color-mix(in oklab, var(--ivory) 96%, transparent) 22%, color-mix(in oklab, var(--ivory) 70%, transparent) 36%, transparent 58%);
+  --gradient-hero-mobile: linear-gradient(180deg, var(--ivory) 0%, var(--ivory) 43%, color-mix(in oklab, var(--ivory) 90%, transparent) 53%, transparent 72%);
+
+  --background: var(--ivory);
+  --foreground: var(--ink);
+  --card: var(--paper);
+  --card-foreground: var(--ink);
+  --popover: var(--paper);
+  --popover-foreground: var(--ink);
+  --primary: var(--ember);
+  --primary-foreground: var(--ember-foreground);
+  --secondary: var(--forest);
+  --secondary-foreground: var(--forest-foreground);
+  --muted: oklch(0.945 0.012 88);
+  --muted-foreground: oklch(0.52 0.01 130);
+  --accent: var(--sage);
+  --accent-foreground: var(--forest);
+  --destructive: oklch(0.55 0.2 27);
+  --destructive-foreground: oklch(0.98 0 0);
+  --border: oklch(0.89 0.015 88);
+  --input: oklch(0.87 0.015 88);
+  --ring: var(--ember);
+
+  --shadow-soft: 0 1px 2px oklch(0.25 0.012 135 / 6%), 0 8px 24px -12px oklch(0.25 0.012 135 / 18%);
+  --shadow-lift: 0 2px 4px oklch(0.25 0.012 135 / 6%), 0 24px 48px -20px oklch(0.25 0.012 135 / 30%);
+  --shadow-ember: 0 10px 30px -10px color-mix(in oklab, var(--ember) 60%, transparent);
+
+  --dur-fast: 150ms;
+  --dur-base: 260ms;
+  --dur-slow: 520ms;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    letter-spacing: 0;
+    font-variation-settings: "SOFT" 50, "opsz" 96;
+  }
+  ::selection {
+    background: var(--peach);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* Contour-line map texture used behind map previews */
+@utility map-grid {
+  background-color: var(--sage);
+  background-image:
+    linear-gradient(oklch(1 0 0 / 55%) 1px, transparent 1px),
+    linear-gradient(90deg, oklch(1 0 0 / 55%) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+@utility eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+@utility grain {
+  position: relative;
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.06;
+    background-image: radial-gradient(oklch(0.25 0.012 135) 0.6px, transparent 0.6px);
+    background-size: 4px 4px;
+  }
+}
+
+@keyframes marker-pulse {
+  0% { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+@utility animate-marker-pulse {
+  animation: marker-pulse 2.2s var(--ease-civic) infinite;
+}
+
+.hero-shade { background: var(--gradient-hero); }
+.hero-scroll { height: 290svh; }
+.hero-inner { height: calc(100svh - 112px); min-height: 550px; padding-bottom: 82px; }
+.hero-next { height: 40px; }
+.hero-scroll-static { height: auto; }
+.hero-scroll-static .hero-sticky { position: relative; top: auto; }
+
+.hero-art img, .hero-art canvas { object-position: center; }
+.hero-art canvas { opacity: 0; transition: opacity 350ms var(--ease-civic); }
+.hero-art canvas[data-ready="true"] { opacity: 1; }
+.hero-report { position: absolute; width: 220px; }
+.hero-report-0 { top: 20%; left: 53%; }
+.hero-report-1 { top: 48%; right: 1%; }
+.hero-report-2 { top: 66%; left: 49%; }
+.hero-pin { animation: gentle-nudge 3s ease-in-out infinite; }
+@media (min-width: 640px) and (max-width: 1023px) {
+  .hero-inner { min-height: 550px; padding-top: 32px; }
+  .hero-copy > div:last-child { margin-top: 12px; }
+  .hero-art img, .hero-art canvas { object-position: 58% center; }
+  .hero-shade { background: linear-gradient(90deg, var(--ivory), color-mix(in oklab, var(--ivory) 92%, transparent) 32%, transparent 95%); }
+  .hero-copy { max-width: 390px; }
+}
+@media (max-width: 639px) {
+  .hero-shade { background: var(--gradient-hero-mobile); }
+  .hero-scroll { height: 230svh; }
+  .hero-inner { min-height: 700px; padding-top: 28px; }
+  .hero-timeline { bottom: 18px; grid-template-columns: minmax(0,1fr); }
+  .hero-timeline > div { background: color-mix(in oklab, var(--paper) 94%, transparent); padding: 10px; border-radius: var(--radius); box-shadow: var(--shadow-soft); }
+  .hero-next { font-size: 10px; padding-inline: 24px; }
+  .hero-next > span:first-child { display: none; }
+  .hero-art { height: 44%; top: auto; bottom: 0; }
+  .hero-art img, .hero-art canvas { object-position: 70% center; }
+  .hero-note { bottom: 18px; }
+  .hero-copy { max-width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) { .hero-pin { animation: none; } .hero-scroll { height: auto; } .hero-sticky { position: relative; top: auto; } }
+@keyframes gentle-nudge {
+  0%, 100% { transform: translateY(-2px); }
+  50% { transform: translateY(3px); }
+}
+@utility animate-gentle-nudge {
+  animation: gentle-nudge 2s ease-in-out infinite;
+}
