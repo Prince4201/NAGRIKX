@@ -9,7 +9,7 @@ export const Route = createFileRoute('/_authenticated')({
     if (isDevSignedIn()) return;
     // Otherwise require a real Supabase session
     const { data, error } = await supabase.auth.getUser();
-    if (error || !data.user) throw redirect({ to: '/login' });
+    if (error || !data.user) throw redirect({ to: '/login', replace: true });
   },
   component: Outlet,
 });

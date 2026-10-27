@@ -110,7 +110,7 @@ export function ReportWizard({
       const saved = await sendReport({data:{id,title:d.title,description:d.description,category:d.category as IssueCategoryId,address:d.address,city:d.city,latitude:d.coords?.lat,longitude:d.coords?.lng,photos:paths}});
       paths = [];
       await queryClient.invalidateQueries({queryKey:["workspace"]});
-      await navigate({to:"/reports/$id",params:{id:saved}});
+      await navigate({ to: "/reports/$id", params: { id: saved }, replace: true });
     } catch (err) {
       await removeUnusedPhotos(paths);
       setSubmitError(err instanceof Error ? err.message : "Something went wrong.");

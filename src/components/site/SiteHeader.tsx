@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { AnimatePresence, motion, useReducedMotion, useScroll, useSpring } from "motion/react";
-import { Menu, X, Plus } from "lucide-react";
+import { Menu, X, Plus, LayoutDashboard, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { isDevSignedIn, clearDevToken } from "@/lib/dev-auth";
+import { isDevSignedIn, clearDevToken, getStoredDevToken, parseDevToken } from "@/lib/dev-auth";
 import { Logo } from "./Logo";
 
 export const NAV_LINKS = [
@@ -16,22 +16,44 @@ export const NAV_LINKS = [
 
 export function SiteHeader() {
   const navigate = useNavigate();
-  const [signedIn,setSignedIn] = useState(false);
+  const [signedIn, setSignedIn] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
 
   useEffect(() => {
     // Check both Supabase session AND dev token
     const checkAuth = async () => {
       if (isDevSignedIn()) {
+        const token = getStoredDevToken();
+        const parsed = parseDevToken(token || '');
         setSignedIn(true);
+        setUserRole(parsed?.role || null);
         return;
       }
       const { data } = await supabase.auth.getUser();
-      setSignedIn(Boolean(data.user));
+      if (data.user) {
+        setSignedIn(true);
+        const { data: roleRow } = await supabase.from('user_roles').select('role').eq('user_id', data.user.id).single();
+        setUserRole(roleRow?.role || 'citizen');
+      } else {
+        setSignedIn(false);
+        setUserRole(null);
+      }
     };
     void checkAuth();
 
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSignedIn(Boolean(session) || isDevSignedIn());
+      if (session) {
+        setSignedIn(true);
+        void checkAuth();
+      } else if (isDevSignedIn()) {
+        setSignedIn(true);
+        const token = getStoredDevToken();
+        const parsed = parseDevToken(token || '');
+        setUserRole(parsed?.role || null);
+      } else {
+        setSignedIn(false);
+        setUserRole(null);
+      }
     });
     return () => data.subscription.unsubscribe();
   }, []);
@@ -40,13 +62,17 @@ export function SiteHeader() {
     clearDevToken();
     await supabase.auth.signOut();
     setSignedIn(false);
-    await navigate({ to: '/' });
+    setUserRole(null);
+    await navigate({ to: '/', replace: true });
   };
 
   const [open, setOpen] = useState(false);
   const reduce = useReducedMotion();
   const { scrollYProgress } = useScroll();
   const progress = useSpring(scrollYProgress, { stiffness: 160, damping: 30 });
+
+  const isStaff = userRole === 'department_officer' || userRole === 'admin';
+  const workspaceHref = userRole === 'admin' ? '/admin' : '/dashboard';
 
   return (
     <header className="sticky top-0 z-40 border-b border-ink/10 bg-ivory/95 px-4 backdrop-blur-xl">
@@ -66,15 +92,37 @@ export function SiteHeader() {
           ))}
         </nav>
         <div className="flex shrink-0 items-center gap-2">
-          <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
-            <Link to={signedIn?"/dashboard":"/login"}>{signedIn?"My workspace":"Sign In"}</Link>
-          </Button>
-          {signedIn && <Button variant="ghost" size="sm" className="hidden sm:inline-flex" onClick={handleSignOut}>Sign out</Button>}
-          <Button asChild variant="forest" size="sm" className="hidden sm:inline-flex">
-            <Link to="/report">
-              <Plus /> Report an Issue
-            </Link>
-          </Button>
+          {signedIn ? (
+            <>
+              <Button asChild variant="forest" size="sm" className="hidden sm:inline-flex shadow-xs gap-1.5">
+                <Link to={workspaceHref}>
+                  <LayoutDashboard className="h-3.5 w-3.5" />
+                  <span>Go to Workspace</span>
+                  <ArrowRight className="h-3 w-3" />
+                </Link>
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="hidden sm:inline-flex text-xs text-muted-foreground hover:text-destructive"
+                onClick={handleSignOut}
+              >
+                Sign out
+              </Button>
+            </>
+          ) : (
+            <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
+              <Link to="/login">Sign In</Link>
+            </Button>
+          )}
+
+          {!isStaff && (
+            <Button asChild variant={signedIn ? "outline" : "forest"} size="sm" className="hidden sm:inline-flex">
+              <Link to="/report">
+                <Plus /> Report an Issue
+              </Link>
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="icon"
@@ -109,17 +157,34 @@ export function SiteHeader() {
                 {l.label}
               </Link>
             ))}
-            <div className="mt-2 grid grid-cols-2 gap-2 border-t pt-3">
-              <Button asChild variant="outline">
-                <Link to={signedIn?"/dashboard":"/login"} onClick={() => setOpen(false)}>
-                  {signedIn?"Workspace":"Sign In"}
-                </Link>
-              </Button>
-              <Button asChild>
-                <Link to="/report" onClick={() => setOpen(false)}>
-                  Report
-                </Link>
-              </Button>
+            <div className={`mt-2 grid ${signedIn || !isStaff ? 'grid-cols-2' : 'grid-cols-1'} gap-2 border-t pt-3`}>
+              {signedIn ? (
+                <>
+                  <Button asChild variant="forest">
+                    <Link to={workspaceHref} onClick={() => setOpen(false)}>
+                      Go to Workspace
+                    </Link>
+                  </Button>
+                  <Button variant="ghost" onClick={() => { setOpen(false); void handleSignOut(); }}>
+                    Sign out
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button asChild variant="outline">
+                    <Link to="/login" onClick={() => setOpen(false)}>
+                      Sign In
+                    </Link>
+                  </Button>
+                  {!isStaff && (
+                    <Button asChild>
+                      <Link to="/report" onClick={() => setOpen(false)}>
+                        Report an Issue
+                      </Link>
+                    </Button>
+                  )}
+                </>
+              )}
             </div>
           </motion.nav>
         )}

@@ -1,13 +1,35 @@
-import { useState, type FormEvent } from "react";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useState, useEffect, type FormEvent } from "react";
+import { createFileRoute, Link, useNavigate, redirect } from "@tanstack/react-router";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AuthShell } from "@/components/forms/AuthShell";
 import { TextField, FormNotice } from "@/components/forms/FormField";
 import { signInSchema, toFieldErrors, type FieldErrors } from "@/lib/validation";
 import { isBackendConfigured, signIn } from "@/lib/backend";
+import { isDevSignedIn, getStoredDevToken, parseDevToken } from "@/lib/dev-auth";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/login")({
+  beforeLoad: async () => {
+    if (typeof window !== "undefined") {
+      if (isDevSignedIn()) {
+        const token = getStoredDevToken();
+        const parsed = token ? parseDevToken(token) : null;
+        const target = parsed?.role === "admin" ? "/admin" : "/dashboard";
+        throw redirect({ to: target, replace: true });
+      }
+      const { data } = await supabase.auth.getUser();
+      if (data.user) {
+        const { data: roles } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", data.user.id);
+        const role = roles?.[0]?.role;
+        const target = role === "admin" ? "/admin" : "/dashboard";
+        throw redirect({ to: target, replace: true });
+      }
+    }
+  },
   head: () => ({
     meta: [
       { property: "og:type", content: "website" },
@@ -34,6 +56,34 @@ function LoginPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    let active = true;
+    async function checkExistingAuth() {
+      if (isDevSignedIn()) {
+        const token = getStoredDevToken();
+        const parsed = token ? parseDevToken(token) : null;
+        const target = parsed?.role === "admin" ? "/admin" : "/dashboard";
+        await navigate({ to: target, replace: true });
+        return;
+      }
+      const { data } = await supabase.auth.getUser();
+      if (!active) return;
+      if (data.user) {
+        const { data: roles } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", data.user.id);
+        const role = roles?.[0]?.role;
+        const target = role === "admin" ? "/admin" : "/dashboard";
+        await navigate({ to: target, replace: true });
+      }
+    }
+    void checkExistingAuth();
+    return () => {
+      active = false;
+    };
+  }, [navigate]);
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setFormError(null);
@@ -42,8 +92,23 @@ function LoginPage() {
     setErrors({});
     setLoading(true);
     try {
-      await signIn(parsed.data);
-      await navigate({to:"/dashboard"});
+      const result = await signIn(parsed.data);
+      let target: "/admin" | "/dashboard" = "/dashboard";
+      if ("user" in result && result.user) {
+        const u = result.user as { id?: string; role?: string };
+        if (u.role === "admin") {
+          target = "/admin";
+        } else if (u.id) {
+          const { data: roles } = await supabase
+            .from("user_roles")
+            .select("role")
+            .eq("user_id", u.id);
+          if (roles?.[0]?.role === "admin") {
+            target = "/admin";
+          }
+        }
+      }
+      await navigate({ to: target, replace: true });
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
     } finally {

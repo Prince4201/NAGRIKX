@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useSuspenseQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { workspaceQuery } from '@/lib/workspace-query';
-import { getAdminUsers, setRole, saveDepartment, getAdminAllReports, adminSendNotification, adminReplyReport } from '@/lib/civic.functions';
+import { getAdminUsers, setRole, saveDepartment, getAdminAllReports, adminSendNotification, adminReplyReport, getAdminReportEvents } from '@/lib/civic.functions';
 import { pageHead } from '@/lib/page-head';
 import { WorkspaceShell } from '@/components/workspace/WorkspaceShell';
 import { Button } from '@/components/ui/button';
@@ -209,7 +209,14 @@ function AdminReportRow({ report: r }: { report: AdminReport }) {
   const [replyText, setReplyText] = useState('');
   const [busy, setBusy] = useState(false);
   const reply = useServerFn(adminReplyReport);
+  const getEvents = useServerFn(getAdminReportEvents);
   const qc = useQueryClient();
+
+  const eventsQuery = useQuery({
+    queryKey: ['admin-report-events', r.id],
+    queryFn: () => getEvents({ data: { reportId: r.id } }),
+    enabled: expanded,
+  });
 
   const statusColors: Record<string, string> = {
     reported: 'bg-amber-100 text-amber-800',
@@ -231,7 +238,10 @@ function AdminReportRow({ report: r }: { report: AdminReport }) {
       await reply({ data: { reportId: r.id, message: replyText } });
       setReplyText('');
       toast.success('Reply sent to citizen.');
-      await qc.invalidateQueries({ queryKey: ['admin-all-reports'] });
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['admin-report-events', r.id] }),
+        qc.invalidateQueries({ queryKey: ['admin-all-reports'] }),
+      ]);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Could not send reply.');
     } finally {
@@ -309,6 +319,58 @@ function AdminReportRow({ report: r }: { report: AdminReport }) {
                 <p><span className="text-muted-foreground">Resolution:</span> {r.resolution_note}</p>
               )}
             </div>
+          </div>
+
+          {/* Citizen Messages & Updates Thread */}
+          <div className="border-t pt-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <h4 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <MessageSquare className="h-3.5 w-3.5 text-forest" /> Messages & Conversation
+              </h4>
+              {eventsQuery.data && (
+                <span className="text-[11px] text-muted-foreground">
+                  {eventsQuery.data.filter((e) => e.event_type === 'comment' || e.event_type === 'admin_reply').length} message(s)
+                </span>
+              )}
+            </div>
+
+            {eventsQuery.isPending ? (
+              <p className="py-2 text-xs text-muted-foreground">Loading conversation…</p>
+            ) : eventsQuery.error ? (
+              <p className="py-2 text-xs text-red-500">Could not load messages.</p>
+            ) : (eventsQuery.data?.length ?? 0) === 0 ? (
+              <p className="py-2 text-xs italic text-muted-foreground">No citizen messages or updates on this report yet.</p>
+            ) : (
+              <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                {eventsQuery.data?.map((e) => {
+                  const isCitizen = e.event_type === 'comment' || e.actor_role === 'citizen';
+                  const isAdmin = e.event_type === 'admin_reply' || e.actor_role === 'admin';
+                  return (
+                    <div
+                      key={e.id}
+                      className={`rounded-lg border p-3 text-xs space-y-1 ${
+                        isAdmin
+                          ? 'border-forest/30 bg-forest/5 ml-4'
+                          : 'border-border bg-paper mr-4'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between text-muted-foreground">
+                        <span className="font-semibold text-foreground flex items-center gap-1.5">
+                          {e.actor_name || (isAdmin ? 'Administrator' : r.citizen_name || 'Citizen')}
+                          <span className={`rounded px-1.5 py-0.5 text-[10px] uppercase font-mono ${
+                            isAdmin ? 'bg-forest/15 text-forest' : 'bg-muted text-muted-foreground'
+                          }`}>
+                            {e.actor_role || (isAdmin ? 'Admin' : 'Citizen')}
+                          </span>
+                        </span>
+                        <span className="text-[11px]">{new Date(e.created_at).toLocaleString('en-IN')}</span>
+                      </div>
+                      <p className="whitespace-pre-wrap text-sm text-foreground pt-0.5">{e.message}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Admin reply form */}

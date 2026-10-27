@@ -1,5 +1,5 @@
 import { useState, useEffect, type FormEvent } from "react";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, redirect } from "@tanstack/react-router";
 import { Loader2, User, Briefcase, AlertCircle, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AuthShell } from "@/components/forms/AuthShell";
@@ -8,8 +8,29 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { registerSchema, toFieldErrors, type FieldErrors } from "@/lib/validation";
 import { isBackendConfigured, register } from "@/lib/backend";
 import { supabase } from "@/integrations/supabase/client";
+import { isDevSignedIn, getStoredDevToken, parseDevToken } from "@/lib/dev-auth";
 
 export const Route = createFileRoute("/register")({
+  beforeLoad: async () => {
+    if (typeof window !== "undefined") {
+      if (isDevSignedIn()) {
+        const token = getStoredDevToken();
+        const parsed = token ? parseDevToken(token) : null;
+        const target = parsed?.role === "admin" ? "/admin" : "/dashboard";
+        throw redirect({ to: target, replace: true });
+      }
+      const { data } = await supabase.auth.getUser();
+      if (data.user) {
+        const { data: roles } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", data.user.id);
+        const role = roles?.[0]?.role;
+        const target = role === "admin" ? "/admin" : "/dashboard";
+        throw redirect({ to: target, replace: true });
+      }
+    }
+  },
   head: () => ({
     meta: [
       { property: "og:type", content: "website" },
@@ -43,22 +64,40 @@ function RegisterPage() {
   const [departments, setDepartments] = useState(FALLBACK_DEPARTMENTS);
 
   useEffect(() => {
-    async function loadDepartments() {
+    let active = true;
+    async function checkAuthAndDepartments() {
+      if (isDevSignedIn()) {
+        const token = getStoredDevToken();
+        const parsed = token ? parseDevToken(token) : null;
+        const target = parsed?.role === "admin" ? "/admin" : "/dashboard";
+        await navigate({ to: target, replace: true });
+        return;
+      }
+      const { data: authData } = await supabase.auth.getUser();
+      if (!active) return;
+      if (authData.user) {
+        await navigate({ to: "/dashboard", replace: true });
+        return;
+      }
+
       try {
         const { data } = await supabase
           .from('departments')
           .select('id, name')
           .eq('active', true)
           .order('name');
-        if (data && data.length > 0) {
+        if (active && data && data.length > 0) {
           setDepartments(data);
         }
       } catch (err) {
         console.warn('Could not load departments from database, using fallback:', err);
       }
     }
-    void loadDepartments();
-  }, []);
+    void checkAuthAndDepartments();
+    return () => {
+      active = false;
+    };
+  }, [navigate]);
   const [v, setV] = useState({
     fullName: "",
     email: "",
@@ -95,7 +134,7 @@ function RegisterPage() {
           "Your department officer application has been submitted! An administrator will review and approve your account. You'll receive an email once approved."
         );
       } else if (result.session) {
-        await navigate({ to: "/dashboard" });
+        await navigate({ to: "/dashboard", replace: true });
       } else {
         setNotice("Check your email to confirm your account before signing in.");
       }

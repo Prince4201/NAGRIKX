@@ -403,6 +403,23 @@ export type Database = {
         Args: { _report_id: string; _message: string }
         Returns: undefined
       }
+      get_report_by_id: {
+        Args: { _id: string }
+        Returns: Database["public"]["Tables"]["reports"]["Row"][]
+      }
+      get_report_events: {
+        Args: { _report_id: string }
+        Returns: {
+          id: string
+          report_id: string
+          actor_id: string
+          actor_name: string | null
+          actor_role: string | null
+          event_type: string
+          message: string
+          created_at: string
+        }[]
+      }
       admin_approve_officer: {
         Args: { _app_id: string }
         Returns: undefined

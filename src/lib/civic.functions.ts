@@ -34,13 +34,43 @@ export const getWorkspace = createServerFn({ method: 'POST' }).middleware([requi
   return { userId: uid, profile: profileData, role: roleData, reports: reports.data ?? [], notifications: notifications.data ?? [], departments: departmentList };
 });
 export const getReport = createServerFn({method:'POST'}).middleware([requireSupabaseAuth]).validator(z.object({id:pgUuid})).handler(async({data,context})=>{
-  const r = await context.supabase.from('reports').select('*').eq('id',data.id).single();
-  if(r.error || !r.data) throw new Error('Report not found or access is not permitted.');
-  const events = await context.supabase.from('report_events').select('*').eq('report_id',data.id).order('created_at');
-  if(events.error) throw new Error(events.error.message);
-  const photos = await context.supabase.storage.from('report-photos').createSignedUrls(r.data.photo_paths, 600);
-  if(photos.error && r.data.photo_paths.length) throw new Error('Could not load report photos.');
-  return {report:r.data,events:events.data??[],photos:(photos.data??[]).map((p)=>({url:p.signedUrl??'',path:p.path??''}))};
+  let reportData: Tables<'reports'> | null = null;
+  const directReport = await context.supabase.from('reports').select('*').eq('id', data.id).single();
+  if (directReport.data) {
+    reportData = directReport.data;
+  } else {
+    const rpcReport = await context.supabase.rpc('get_report_by_id', { _id: data.id });
+    if (rpcReport.data && rpcReport.data.length > 0) {
+      reportData = rpcReport.data[0] as Tables<'reports'>;
+    }
+  }
+  if (!reportData) throw new Error('Report not found or access is not permitted.');
+
+  let eventsData: Tables<'report_events'>[] = [];
+  const directEvents = await context.supabase.from('report_events').select('*').eq('report_id', data.id).order('created_at');
+  if (directEvents.data) {
+    eventsData = directEvents.data;
+  } else {
+    const rpcEvents = await context.supabase.rpc('get_report_events', { _report_id: data.id });
+    if (rpcEvents.data) {
+      eventsData = rpcEvents.data.map((e) => ({
+        id: e.id,
+        report_id: e.report_id,
+        actor_id: e.actor_id,
+        event_type: e.event_type,
+        message: e.message,
+        created_at: e.created_at,
+      }));
+    }
+  }
+
+  let photoList: Array<{ url: string; path: string }> = [];
+  if (reportData.photo_paths && reportData.photo_paths.length > 0) {
+    const photos = await context.supabase.storage.from('report-photos').createSignedUrls(reportData.photo_paths, 600);
+    photoList = (photos.data ?? []).map((p) => ({ url: p.signedUrl ?? '', path: p.path ?? '' }));
+  }
+
+  return { report: reportData, events: eventsData, photos: photoList };
 });
 export const submitReport = createServerFn({method:'POST'}).middleware([requireSupabaseAuth]).validator(reportSubmitSchema).handler(async({data,context})=>{
  const args = {_id:data.id,_title:data.title,_description:data.description,_category:data.category,_address:data.address,_city:data.city,_latitude:data.latitude,_longitude:data.longitude,_photos:data.photos};
@@ -141,4 +171,23 @@ export const adminReplyReport = createServerFn({method:'POST'}).middleware([requ
 })).handler(async({data,context})=>{
   const r = await context.supabase.rpc('admin_reply_report', { _report_id: data.reportId, _message: data.message } as Database['public']['Functions']['admin_reply_report']['Args']);
   if(r.error) throw new Error(r.error.message);
+});
+
+// ── Admin: Fetch report messages & events timeline ────────────────────
+export const getAdminReportEvents = createServerFn({method:'POST'}).middleware([requireSupabaseAuth]).validator(z.object({
+  reportId: pgUuid,
+})).handler(async({data,context})=>{
+  const r = await context.supabase.rpc('get_report_events', { _report_id: data.reportId });
+  if (r.data) return r.data;
+  const direct = await context.supabase.from('report_events').select('*').eq('report_id', data.reportId).order('created_at');
+  return (direct.data ?? []).map((e) => ({
+    id: e.id,
+    report_id: e.report_id,
+    actor_id: e.actor_id,
+    actor_name: null,
+    actor_role: null,
+    event_type: e.event_type,
+    message: e.message,
+    created_at: e.created_at,
+  }));
 });
